@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: jdbc:mysql://[IP_ADDRESS]/huobao_drama?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: 
+    password: 
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  ai:
+    openai:
+      api-key: 
+      base-url: 
+      chat:
+        options:
+          model: ${AI_MODEL:gpt-4o}
+          temperature: 0.7
+
+seedance:
+  access-key: 
+  secret-key: 
+  ark-api-key:

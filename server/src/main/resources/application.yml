@@ -1,0 +1,34 @@
+server:
+  port: 5679
+
+spring:
+  application:
+    name: huobao-drama-server
+  profiles:
+    active: dev
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+  flyway:
+    enabled: false
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  global-config:
+    db-config:
+      logic-delete-field: deletedAt
+      logic-not-delete-value: "null"
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# Storage
+storage:
+  type: local
+  local-path: ../data/storage
+  base-url: http://localhost:5679/static
+
+# Skills
+skills:
+  path: ../skills

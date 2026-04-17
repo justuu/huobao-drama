@@ -1,0 +1,46 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - button "火宝短剧 火宝短剧 Huobao Shorts" [ref=e6] [cursor=pointer]:
+        - img "火宝短剧" [ref=e8]
+        - generic [ref=e9]:
+          - generic [ref=e10]: 火宝短剧
+          - generic [ref=e11]: Huobao Shorts
+      - navigation [ref=e12]:
+        - link "项目" [ref=e13] [cursor=pointer]:
+          - /url: /
+          - img [ref=e14]
+          - generic [ref=e19]: 项目
+        - link "设置" [ref=e20] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e21]
+          - generic [ref=e24]: 设置
+    - main [ref=e30]:
+      - generic [ref=e31]:
+        - generic [ref=e32]:
+          - generic [ref=e33]:
+            - heading "短剧项目" [level=1] [ref=e34]
+            - paragraph [ref=e35]: 1 个项目
+          - button "新建项目" [ref=e36] [cursor=pointer]:
+            - img [ref=e37]
+            - text: 新建项目
+        - generic [ref=e39] [cursor=pointer]:
+          - generic [ref=e46]:
+            - generic [ref=e47]:
+              - generic [ref=e48]:
+                - img [ref=e49]
+                - text: 0 集
+              - button "删除" [ref=e51]:
+                - img [ref=e52]
+            - heading "大哥死后，大嫂杀疯了" [level=3] [ref=e55]
+            - generic [ref=e56]:
+              - generic [ref=e57]: realistic
+              - generic [ref=e58]:
+                - img [ref=e59]
+                - text: "0"
+              - generic [ref=e62]:
+                - img [ref=e63]
+                - text: "0"
+          - generic [ref=e68]: 1 小时前
+  - region "Notifications alt+T":
+    - list

@@ -127,3 +127,23 @@ export const voicesAPI = {
   list: (provider?: string) => api.get(`/ai-voices${provider ? `?provider=${provider}` : ''}`),
   sync: () => api.post('/ai-voices/sync', {}),
 }
+
+export const propAPI = {
+  list: (dramaId: number) => api.get(`/props?drama_id=${dramaId}`),
+  create: (d: any) => api.post('/props', d),
+  update: (id: number, d: any) => api.put(`/props/${id}`, d),
+  del: (id: number) => api.del(`/props/${id}`),
+}
+
+export const seedanceAPI = {
+  createAssetGroup: (dramaId: number, groupName?: string) =>
+    api.post('/seedance/asset-groups', { drama_id: dramaId, group_name: groupName }),
+  uploadAsset: (d: { drama_id: number; ref_type: string; ref_id: number; name: string; image_url: string }) =>
+    api.post('/seedance/assets', d),
+  uploadAll: (dramaId: number) =>
+    api.post('/seedance/assets/upload-all', { drama_id: dramaId }),
+  list: (dramaId: number) => api.get(`/seedance/assets?dramaId=${dramaId}`),
+  generateVideo: (groupId: string, dramaId: number) =>
+    api.post('/videos/seedance', { group_id: groupId, drama_id: dramaId }),
+  pollVideoStatus: (id: number) => api.get(`/videos/seedance/${id}/status`),
+}

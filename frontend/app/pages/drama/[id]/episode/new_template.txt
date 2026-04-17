@@ -1,0 +1,628 @@
+<template>
+  <div class="studio" v-if="drama">
+    <header class="studio-topbar">
+      <div class="studio-topbar-main">
+        <button class="back-btn topbar-back" @click="navigateTo(`/drama/${dramaId}`)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+          </svg>
+          返回项目
+        </button>
+        <div class="studio-identity">
+          <h1 class="studio-title">{{ drama.title }}</h1>
+          <span class="studio-episode-chip">第 {{ episodeNumber }} 集</span>
+          <div class="studio-meta-row">
+            <span class="studio-meta-inline">{{ chars.length }} 角色 · {{ scenes.length }} 场景 · {{ sbs.length }} 镜头</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="studio-topbar-side">
+        <div class="studio-actions">
+          <button class="btn" @click="refresh">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            刷新
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="studio-body">
+    <!-- ========== LEFT SIDEBAR ========== -->
+    <aside class="sidebar">
+      <nav class="pipeline">
+        <button
+          v-for="s in mainSteps"
+          :key="s.id"
+          :class="['pipe-step', { active: step === s.id, done: s.done }]"
+          @click="step = s.id"
+        >
+          <span class="pipe-step-num">
+            <svg v-if="s.done" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+            <span v-else>{{ s.num }}</span>
+          </span>
+          <span class="pipe-step-copy">
+            <span class="pipe-step-label">{{ s.label }}</span>
+            <span class="pipe-step-desc">{{ s.desc }}</span>
+          </span>
+        </button>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <button class="refresh-btn" @click="refresh">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          刷新数据
+        </button>
+      </div>
+    </aside>
+
+    <!-- ========== MAIN CONTENT ========== -->
+    <main class="main">
+      <!-- Step 1 sub-tabs -->
+      <div v-if="step === 1" class="stage-subnav">
+        <button v-for="sub in step1Tabs" :key="sub.key"
+          :class="['stage-subnav-item', { active: subTab === sub.key, done: sub.done }]"
+          @click="subTab = sub.key">
+          <span>{{ sub.label }}</span>
+          <span v-if="sub.done" class="stage-subnav-dot"></span>
+        </button>
+      </div>
+
+      <!-- ===== STEP 1: 剧本导入 ===== -->
+      <div v-if="step === 1" class="content-panel">
+        <!-- Sub: Raw Content -->
+        <div v-if="subTab === 'raw'" class="step-editor">
+          <div class="step-toolbar">
+            <div class="toolbar-left">
+              <div class="step-indicator">
+                <span class="step-num">01</span>
+                <span class="step-name">原始内容</span>
+              </div>
+            </div>
+            <div class="toolbar-right">
+              <span v-if="rawLen" class="char-count">{{ rawLen }} 字</span>
+              <button class="btn btn-sm" @click="saveRaw(); toast.success('已保存')">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                保存
+              </button>
+            </div>
+          </div>
+          <textarea
+            class="fill-textarea"
+            v-model="localRaw"
+            placeholder="粘贴小说原文、故事大纲或分镜描述..."
+          />
+        </div>
+
+        <!-- Sub: Rewrite -->
+        <div v-else-if="subTab === 'rewrite'" class="step-editor">
+          <div class="step-toolbar">
+            <div class="toolbar-left">
+              <div class="step-indicator">
+                <span class="step-num">02</span>
+                <span class="step-name">AI 改写</span>
+              </div>
+            </div>
+            <div class="toolbar-right">
+              <span v-if="scriptLen" class="char-count">{{ scriptLen }} 字</span>
+              <button v-if="rawContent" class="btn btn-sm" @click="skipRewrite">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/><path d="M13 18l6-6-6-6"/></svg>
+                跳过改写
+              </button>
+              <button v-if="scriptContent" class="btn btn-sm" @click="doRewrite" :disabled="rn">
+                <Loader2 v-if="rn && rt === 'script_rewriter'" :size="11" class="animate-spin" />
+                <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+                重新改写
+              </button>
+            </div>
+          </div>
+
+          <div v-if="!scriptContent && !rn" class="step-empty">
+            <div class="empty-visual">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round">
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
+              </svg>
+            </div>
+            <div class="empty-title">AI 改写为格式化剧本</div>
+            <div class="empty-desc">你可以先用 AI 把原始内容整理成格式化剧本，也可以跳过这一步，直接使用原始内容继续提取角色与场景。</div>
+            <div class="step-empty-actions">
+              <button class="btn btn-primary" @click="doRewrite">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                开始改写
+              </button>
+              <button class="btn" @click="skipRewrite">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/><path d="M13 18l6-6-6-6"/></svg>
+                跳过改写
+              </button>
+            </div>
+          </div>
+          <div v-else-if="rn && rt === 'script_rewriter'" class="step-loading">
+            <Loader2 :size="24" class="animate-spin" style="color:var(--accent)" />
+            <div class="loading-text">正在改写剧本...</div>
+          </div>
+          <textarea v-else class="fill-textarea" v-model="localScript" placeholder="格式化剧本内容..." />
+        </div>
+
+        <!-- Sub: Storyboard Breakdown -->
+        <div v-else-if="subTab === 'storyboard'" class="step-editor">
+          <div class="step-toolbar">
+            <div class="toolbar-left">
+              <div class="step-indicator">
+                <span class="step-num">05</span>
+                <span class="step-name">分镜列表</span>
+              </div>
+            </div>
+            <div class="toolbar-right">
+              <span v-if="sbs.length" class="char-count">{{ sbs.length }} 镜头 · {{ totalDuration }}s</span>
+              <button v-if="sbs.length" class="btn btn-sm" @click="addShot">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                添加
+              </button>
+              <template v-if="!sbs.length">
+                <span class="locked-config">视频模型 · {{ lockedVideoConfigLabel }}</span>
+              </template>
+              <button class="btn btn-sm" :disabled="rn" @click="doBreakdown">
+                <Loader2 v-if="rt === 'storyboard_breaker'" :size="11" class="animate-spin" />
+                <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                {{ sbs.length ? '重新拆解' : 'AI 拆解分镜' }}
+              </button>
+            </div>
+          </div>
+
+          <div v-if="sbs.length" class="split-layout">
+            <!-- Shot List -->
+            <div class="shot-list">
+              <div class="shot-list-head">
+                <div>
+                  <div class="shot-list-title">镜头序列</div>
+                  <div class="shot-list-sub">按镜头顺序检查内容与素材状态</div>
+                </div>
+                <span class="tag mono">{{ totalDuration }}s</span>
+              </div>
+              <div class="shot-list-body">
+                <div
+                  v-for="(sb, i) in sbs"
+                  :key="sb.id"
+                  :class="['shot-item', { active: selectedSb?.id === sb.id }]"
+                  @click="selectedSb = sb"
+                >
+                  <div class="shot-item-header">
+                    <div class="shot-num">#{{ String(i+1).padStart(2,'0') }}</div>
+                    <span class="tag" style="font-size:10px">{{ sb.shot_type || sb.shotType || '—' }}</span>
+                    <span v-if="getStoryboardCharacterIds(sb).length" class="tag" style="font-size:10px">{{ getStoryboardCharacterIds(sb).length }} 角色</span>
+                    <div class="shot-status">
+                      <div v-if="sb.imageUrl || sb.composedImage || sb.firstFrameImage" class="shot-dot has-img" title="已生成图片"></div>
+                      <div v-if="sb.videoUrl || sb.composedVideoUrl" class="shot-dot has-video" title="已生成视频"></div>
+                      <div v-if="sb.dialogue" class="shot-dot has-dialogue" title="有对白"></div>
+                    </div>
+                  </div>
+                  <div class="shot-body">
+                    <div class="shot-desc">{{ sb.description || sb.title || '无描述' }}</div>
+                  </div>
+                  <div class="shot-meta">
+                    <span class="mono dim" style="font-size:10px">{{ sb.duration || 10 }}s</span>
+                    <span v-if="sb.location" class="shot-location">{{ sb.location }}</span>
+                    <span v-if="getStoryboardCharacterNames(sb).length" class="shot-location">{{ getStoryboardCharacterNames(sb).join(' / ') }}</span>
+                    <span v-if="sb.dialogue" class="shot-dialogue">{{ sb.dialogue }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Detail Panel -->
+            <div class="detail-panel" v-if="selectedSb">
+                <div class="detail-head">
+                  <div class="detail-head-copy">
+                    <span class="detail-head-title">镜头 #{{ sbs.indexOf(selectedSb) + 1 }}</span>
+                  <span class="detail-head-sub">{{ selectedSb.title || `镜头 ${sbs.indexOf(selectedSb) + 1}` }} · {{ selectedSb.shot_type || selectedSb.shotType || '未设置景别' }}</span>
+                  </div>
+                  <span class="tag mono">{{ (selectedSb.duration || 10) }}s</span>
+                  <button class="btn btn-ghost btn-icon ml-auto" style="color:var(--error)" @click="deleteShot(selectedSb)">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                  </button>
+              </div>
+              <div class="detail-body">
+                <div class="detail-hero">
+                  <div class="detail-hero-copy">
+                    <div class="detail-hero-label">镜头概览</div>
+                    <div class="detail-hero-text">{{ selectedSb.description || selectedSb.title || '当前镜头还没有画面描述，建议先补充核心动作和构图。' }}</div>
+                    <div class="detail-status-row">
+                      <span class="tag">{{ getSceneName(selectedSb) }}</span>
+                      <span class="tag">{{ selectedSb.angle || '未设角度' }}</span>
+                      <span class="tag">{{ selectedSb.movement || '未设运镜' }}</span>
+                      <span class="tag" :class="getFirstFrame(selectedSb) ? 'tag-success' : ''">首帧 {{ getFirstFrame(selectedSb) ? '已生成' : '待生成' }}</span>
+                      <span class="tag" :class="getLastFrame(selectedSb) ? 'tag-success' : ''">尾帧 {{ getLastFrame(selectedSb) ? '已生成' : '待生成' }}</span>
+                      <span class="tag" :class="hasVid(selectedSb) ? 'tag-success' : ''">视频 {{ hasVid(selectedSb) ? '已生成' : '待生成' }}</span>
+                    </div>
+                  </div>
+                  <div class="detail-preview-grid">
+                    <div class="detail-preview-card">
+                      <div class="detail-preview-title">首帧</div>
+                      <div class="detail-preview-media">
+                        <img
+                          v-if="getFirstFrame(selectedSb)"
+                          :src="'/' + getFirstFrame(selectedSb)"
+                          class="previewable-image"
+                          @click.stop="openImageViewer('/' + getFirstFrame(selectedSb), `镜头 #${sbs.indexOf(selectedSb) + 1} 首帧`)"
+                        />
+                        <div v-else class="detail-preview-empty">待生成</div>
+                      </div>
+                    </div>
+                    <div class="detail-preview-card">
+                      <div class="detail-preview-title">尾帧</div>
+                      <div class="detail-preview-media">
+                        <img
+                          v-if="getLastFrame(selectedSb)"
+                          :src="'/' + getLastFrame(selectedSb)"
+                          class="previewable-image"
+                          @click.stop="openImageViewer('/' + getLastFrame(selectedSb), `镜头 #${sbs.indexOf(selectedSb) + 1} 尾帧`)"
+                        />
+                        <div v-else class="detail-preview-empty">待生成</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="detail-section">
+                  <div class="detail-section-head">
+                    <span class="detail-section-title">镜头结构</span>
+                    <span class="detail-section-copy">景别、角度、运镜、场景绑定和时长</span>
+                  </div>
+                  <div class="field-grid field-grid-4">
+                    <label class="field">
+                      <span class="field-label">标题</span>
+                      <input :value="selectedSb.title || ''" class="input"
+                        @blur="updateField(selectedSb, 'title', $event.target.value)" placeholder="如：雪地逼近" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">景别</span>
+                      <input
+                        list="shot-type-list"
+                        :value="selectedSb.shot_type || selectedSb.shotType || ''"
+                        class="input"
+                        placeholder="选择或输入景别"
+                        @change="updateField(selectedSb, 'shot_type', $event.target.value)"
+                      />
+                      <datalist id="shot-type-list">
+                        <option v-for="t in shotTypes" :key="t" :value="t" />
+                      </datalist>
+                    </label>
+                    <label class="field">
+                      <span class="field-label">角度</span>
+                      <input
+                        list="shot-angle-list"
+                        :value="selectedSb.angle || ''"
+                        class="input"
+                        placeholder="选择或输入角度"
+                        @change="updateField(selectedSb, 'angle', $event.target.value)"
+                      />
+                      <datalist id="shot-angle-list">
+                        <option v-for="t in shotAngles" :key="t" :value="t" />
+                      </datalist>
+                    </label>
+                    <label class="field">
+                      <span class="field-label">运镜</span>
+                      <input
+                        list="shot-movement-list"
+                        :value="selectedSb.movement || ''"
+                        class="input"
+                        placeholder="选择或输入运镜"
+                        @change="updateField(selectedSb, 'movement', $event.target.value)"
+                      />
+                      <datalist id="shot-movement-list">
+                        <option v-for="t in shotMovements" :key="t" :value="t" />
+                      </datalist>
+                    </label>
+                  </div>
+                  <div class="field-grid field-grid-4">
+                    <label class="field">
+                      <span class="field-label">绑定角色</span>
+                      <div class="role-pills">
+                        <button
+                          v-for="char in chars"
+                          :key="char.id"
+                          type="button"
+                          :class="['role-pill', { active: isStoryboardCharacterSelected(selectedSb, char.id) }]"
+                          @click="toggleStoryboardCharacter(selectedSb, char.id)"
+                        >
+                          {{ char.name }}
+                        </button>
+                        <span v-if="!chars.length" class="dim" style="font-size:12px">当前集还没有角色</span>
+                      </div>
+                    </label>
+                    <label class="field">
+                      <span class="field-label">绑定场景</span>
+                      <select class="input" :value="selectedSb.scene_id || selectedSb.sceneId || ''"
+                        @change="updateField(selectedSb, 'scene_id', $event.target.value ? Number($event.target.value) : null)">
+                        <option value="">未绑定场景</option>
+                        <option v-for="scene in scenes" :key="scene.id" :value="scene.id">
+                          {{ scene.location }} · {{ scene.time || '未设时间' }}
+                        </option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span class="field-label">地点</span>
+                      <input :value="selectedSb.location || ''" class="input"
+                        @blur="updateField(selectedSb, 'location', $event.target.value)" placeholder="场景地点" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">时间</span>
+                      <input :value="selectedSb.time || ''" class="input"
+                        @blur="updateField(selectedSb, 'time', $event.target.value)" placeholder="如：深夜 / 清晨" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">时长</span>
+                      <input :value="selectedSb.duration || 10" class="input" type="number" min="1" max="60"
+                        @blur="updateField(selectedSb, 'duration', Number($event.target.value))" />
+                    </label>
+                  </div>
+                </div>
+                <div class="detail-section">
+                  <div class="detail-section-head">
+                    <span class="detail-section-title">画面语义</span>
+                    <span class="detail-section-copy">动作、结果、氛围和对白</span>
+                  </div>
+                  <div class="field-grid field-grid-2">
+                    <label class="field">
+                      <span class="field-label">动作</span>
+                      <textarea :value="selectedSb.action || ''" class="textarea" rows="3"
+                        @blur="updateField(selectedSb, 'action', $event.target.value)" placeholder="谁在做什么，表情和动作细节是什么" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">结果</span>
+                      <textarea :value="selectedSb.result || ''" class="textarea" rows="3"
+                        @blur="updateField(selectedSb, 'result', $event.target.value)" placeholder="镜头结束时的状态变化或画面结果" />
+                    </label>
+                  </div>
+                  <div class="field-grid field-grid-2">
+                    <label class="field">
+                      <span class="field-label">画面描述</span>
+                      <textarea :value="selectedSb.description || ''" class="textarea" rows="4"
+                        @blur="updateField(selectedSb, 'description', $event.target.value)" placeholder="描述画面内容..." />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">氛围</span>
+                      <textarea :value="selectedSb.atmosphere || ''" class="textarea" rows="4"
+                        @blur="updateField(selectedSb, 'atmosphere', $event.target.value)" placeholder="光线、色调、空气感、环境氛围" />
+                    </label>
+                  </div>
+                  <label class="field">
+                    <span class="field-label">对白 / 旁白</span>
+                    <textarea :value="selectedSb.dialogue || ''" class="textarea" rows="3"
+                      @blur="updateField(selectedSb, 'dialogue', $event.target.value)" placeholder="角色名：台词内容 或 旁白：内容" />
+                  </label>
+                </div>
+                <div class="detail-section">
+                  <div class="detail-section-head">
+                    <span class="detail-section-title">生成提示</span>
+                    <span class="detail-section-copy">分别服务图片、视频、配乐和音效生成</span>
+                  </div>
+                  <label class="field">
+                    <span class="field-label">静态画面提示词</span>
+                    <textarea :value="selectedSb.image_prompt || selectedSb.imagePrompt || ''" class="textarea" rows="4"
+                      @blur="updateField(selectedSb, 'image_prompt', $event.target.value)" placeholder="用于首帧、尾帧和镜头图片的单帧画面提示词" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">视频提示词</span>
+                    <textarea :value="selectedSb.video_prompt || selectedSb.videoPrompt || ''" class="textarea" rows="5"
+                      @blur="updateField(selectedSb, 'video_prompt', $event.target.value)" placeholder="按 3 秒分段的视频提示词..." />
+                  </label>
+                  <div class="field-grid field-grid-2">
+                    <label class="field">
+                      <span class="field-label">配乐提示词</span>
+                      <textarea :value="selectedSb.bgm_prompt || selectedSb.bgmPrompt || ''" class="textarea" rows="3"
+                        @blur="updateField(selectedSb, 'bgm_prompt', $event.target.value)" placeholder="如：压抑低频弦乐，缓慢推进" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">音效提示词</span>
+                      <textarea :value="selectedSb.sound_effect || selectedSb.soundEffect || ''" class="textarea" rows="3"
+                        @blur="updateField(selectedSb, 'sound_effect', $event.target.value)" placeholder="如：风雪声、脚踩积雪、衣料摩擦声" />
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-else-if="rn && rt === 'storyboard_breaker'" class="step-loading">
+            <Loader2 :size="24" class="animate-spin" style="color:var(--accent)" />
+            <div class="loading-text">正在拆解分镜并生成提示词...</div>
+          </div>
+
+          <div v-else class="step-empty">
+            <div class="empty-visual">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round">
+                <rect x="2" y="2" width="20" height="20" rx="2.5"/><line x1="7" y1="8" x2="7" y2="16"/><line x1="10" y1="8" x2="10" y2="16"/><line x1="13" y1="8" x2="13" y2="16"/>
+              </svg>
+            </div>
+            <div class="empty-title">将剧本拆解为分镜序列</div>
+            <div class="empty-desc">AI 自动分析剧本，生成镜头列表和视频提示词</div>
+            <div class="locked-config-banner">当前集视频模型：{{ lockedVideoConfigLabel }}</div>
+            <button class="btn btn-primary" @click="doBreakdown">
+              <Loader2 v-if="rt === 'storyboard_breaker'" :size="13" class="animate-spin" />
+              <svg v-else width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              AI 拆解分镜
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ===== STEP 2: 角色+场景+道具 ===== -->
+      <div v-else-if="step === 2" class="content-panel">
+        <div class="step-toolbar prod-toolbar">
+          <div class="toolbar-left">
+            <div class="step-indicator">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <span class="step-name">角色 · 场景 · 道具</span>
+            </div>
+          </div>
+          <div class="prod-tabs">
+            <button v-for="t in step2Tabs" :key="t.id"
+              :class="['prod-tab', { active: subTab === t.id }]"
+              @click="subTab = t.id">
+              <component :is="t.icon" :size="11" />
+              {{ t.label }}
+              <span v-if="t.badge" class="prod-tab-badge">{{ t.badge }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Extract sub-tab -->
+        <div v-if="subTab === 'extract'" class="step-editor">
+          <div class="step-toolbar">
+            <div class="toolbar-left">
+              <div class="step-indicator">
+                <span class="step-name">提取角色与场景</span>
+              </div>
+            </div>
+            <div class="toolbar-right">
+              <span v-if="chars.length" class="char-count">{{ chars.length }} 角色 · {{ scenes.length }} 场景 · {{ dramaProps.length }} 道具</span>
+              <button class="btn btn-sm" @click="doExtract" :disabled="rn">
+                <Loader2 v-if="rn && rt === 'extractor'" :size="11" class="animate-spin" />
+                <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                {{ chars.length ? '重新提取' : '开始提取' }}
+              </button>
+            </div>
+          </div>
+          <div v-if="!chars.length && !rn" class="step-empty">
+            <div class="empty-visual"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+            <div class="empty-title">从剧本提取角色、场景与道具</div>
+            <div class="empty-desc">AI 自动分析剧本，提取角色信息、场景列表和关键道具，与项目已有数据智能去重合并</div>
+            <button class="btn btn-primary" @click="doExtract">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              开始提取
+            </button>
+          </div>
+          <div v-else-if="rn && rt === 'extractor'" class="step-loading">
+            <Loader2 :size="24" class="animate-spin" style="color:var(--accent)" />
+            <div class="loading-text">正在提取角色、场景和道具...</div>
+          </div>
+          <div v-else class="extract-stage">
+            <div class="card extract-card">
+              <div class="extract-card-head">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span>角色</span><span class="tag tag-accent">{{ chars.length }}</span>
+              </div>
+              <div class="extract-list">
+                <div v-for="c in chars" :key="c.id" class="extract-row">
+                  <div class="char-avatar">{{ c.name?.[0] || '?' }}</div>
+                  <div class="extract-info">
+                    <div class="extract-name-row"><div class="extract-name">{{ c.name }}</div><span class="tag">{{ c.role || '角色' }}</span></div>
+                    <div class="extract-meta wrap">{{ c.description || c.appearance || c.personality || '暂无描述' }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="card extract-card" v-if="scenes.length">
+              <div class="extract-card-head">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                <span>场景</span><span class="tag tag-accent">{{ scenes.length }}</span>
+              </div>
+              <div class="extract-list">
+                <div v-for="s in scenes" :key="s.id" class="extract-row">
+                  <div class="scene-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+                  <div class="extract-info">
+                    <div class="extract-name-row"><div class="extract-name">{{ s.location }}</div><span v-if="s.time" class="tag">{{ s.time }}</span></div>
+                    <div class="extract-meta wrap">{{ s.description || s.time || '等待补充场景描述' }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="card extract-card" v-if="dramaProps.length">
+              <div class="extract-card-head">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+                <span>道具</span><span class="tag tag-accent">{{ dramaProps.length }}</span>
+              </div>
+              <div class="extract-list">
+                <div v-for="p in dramaProps" :key="p.id" class="extract-row">
+                  <div class="char-avatar">{{ p.name?.[0] || '?' }}</div>
+                  <div class="extract-info">
+                    <div class="extract-name-row"><div class="extract-name">{{ p.name }}</div><span class="tag">{{ p.type || '道具' }}</span></div>
+                    <div class="extract-meta wrap">{{ p.description || '暂无描述' }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chars sub-tab -->
+        <div v-else-if="subTab === 'chars'" class="prod-content">
+          <div class="prod-section-bar">
+            <span class="dim" style="font-size:12px">{{ visualChars.length }} 个需生成形象角色</span>
+            <span class="tag">{{ lockedImageConfigLabel }}</span>
+            <span v-if="chars.length > visualChars.length" class="tag">旁白仅保留声音</span>
+            <div class="ml-auto flex gap-1">
+              <button class="btn btn-sm" @click="batchCharImages">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                批量生成
+              </button>
+            </div>
+          </div>
+          <div class="asset-grid">
+            <div v-for="c in visualChars" :key="c.id" class="card asset-card">
+              <div class="asset-cover">
+                <img
+                  v-if="c.image_url || c.imageUrl"
+                  :src="'/' + (c.image_url || c.imageUrl)"
+                  class="previewable-image"
+                  @click.stop="openImageViewer('/' + (c.image_url || c.imageUrl), `${c.name} 角色形象`)"
+                />
+                <div v-else class="asset-cover-empty">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </div>
+                <span class="asset-cover-badge" :class="(c.image_url || c.imageUrl) ? 'is-ready' : (isPendingCharImage(c.id) ? 'is-pending' : '')">{{ (c.image_url || c.imageUrl) ? '已生成' : (isPendingCharImage(c.id) ? '生成中' : '待生成') }}</span>
+              </div>
+              <div class="asset-body">
+                <div class="asset-name">{{ c.name }}</div>
+                <div class="asset-meta dim">{{ c.role || '角色' }}</div>
+              </div>
+              <div class="asset-foot">
+                <span :class="['dot', (c.image_url || c.imageUrl) && 'ok', isPendingCharImage(c.id) && 'pending']" />
+                <span class="dim" style="font-size:10px">{{ (c.image_url || c.imageUrl) ? '已生成' : (isPendingCharImage(c.id) ? '生成中' : '待生成') }}</span>
+                <button class="btn btn-sm ml-auto" :disabled="isPendingCharImage(c.id)" @click="genCharImg(c.id)">{{ isPendingCharImage(c.id) ? '生成中' : '生成' }}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scenes sub-tab -->
+        <div v-else-if="subTab === 'scenes'" class="prod-content">
+          <div class="prod-section-bar">
+            <span class="dim" style="font-size:12px">{{ scenes.length }} 个场景</span>
+            <span class="tag">{{ lockedImageConfigLabel }}</span>
+            <div class="ml-auto flex gap-1">
+              <button class="btn btn-sm" @click="batchSceneImages">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                批量生成
+              </button>
+            </div>
+          </div>
+          <div class="asset-grid">
+            <div v-for="s in scenes" :key="s.id" class="card asset-card">
+              <div class="asset-cover wide">
+                <img
+                  v-if="s.image_url || s.imageUrl"
+                  :src="'/' + (s.image_url || s.imageUrl)"
+                  class="previewable-image"
+                  @click.stop="openImageViewer('/' + (s.image_url || s.imageUrl), `${s.location} 场景图`)"
+                />
+                <div v-else class="asset-cover-empty">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                </div>
+                <span class="asset-cover-badge" :class="(s.image_url || s.imageUrl) ? 'is-ready' : (isPendingSceneImage(s.id) ? 'is-pending' : '')">{{ (s.image_url || s.imageUrl) ? '已生成' : (isPendingSceneImage(s.id) ? '生成中' : '待生成') }}</span>
+              </div>
+              <div class="asset-body">
+                <div class="asset-name">{{ s.location }}</div>
+                <div class="asset-meta dim">{{ s.time || '—' }}</div>
+              </div>
+              <div class="asset-foot">
+                <span :class="['dot', (s.image_url || s.imageUrl) && 'ok', isPendingSceneImage(s.id) && 'pending']" />
+                <span class="dim" style="font-size:10px">{{ (s.image_url || s.imageUrl) ? '已生成' : (isPendingSceneImage(s.id) ? '生成中' : '待生成') }}</span>
+                <button class="btn btn-sm ml-auto" :disabled="isPendingSceneImage(s.id)" @click="genSceneImg(s.id)">{{ isPendingSceneImage(s.id) ? '生成中' : '生成' }}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
